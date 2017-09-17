@@ -12,11 +12,11 @@ By maximizing the size of the fake chunk prepared for the known address, it is p
 - Arbitary address can be returned with malloc
 - It is unnecessary to specify the address where the Heap area is located
 
-## Constraint
+## Constraints
 
-- It is possible to call malloc of arbitrary size
+- You can call any size malloc, and free
 - You can freely write 0x20 bytes or more for known addresses
-- There is a vulnerability capable of rewriting fastbins' fd
+- There is a vulnerability that can rewrite fd of fastbins
 
 ## Author
 

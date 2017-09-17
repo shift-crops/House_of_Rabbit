@@ -3,6 +3,7 @@
    Tested in Ubuntu 14.04, 16.04 (64bit).
    
    Yutaro Shimizu
+   @shift_crops
    2017/09/14
 */
 
@@ -11,7 +12,7 @@
 #include <string.h>
 
 char target[0x10] = "Hello, World!";
-unsigned long gbuf[4];
+unsigned long gbuf[6] = {0};
 
 int main(void){
 	void *p, *fast, *small, *fake;
